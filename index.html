@@ -1,0 +1,764 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Watch / Clock Breakdown Worksheet Generator</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    background: #f4f5f7;
+    color: #222;
+    min-height: 100vh;
+    padding: 24px 16px;
+  }
+  .wrap {
+    max-width: 760px;
+    margin: 0 auto;
+  }
+  h1 {
+    font-size: 20px;
+    margin-bottom: 4px;
+  }
+  .sub {
+    font-size: 12px;
+    color: #666;
+    margin-bottom: 20px;
+  }
+
+  .card {
+    background: #fff;
+    border: 1px solid #d8dadd;
+    border-radius: 10px;
+    padding: 20px 24px;
+    margin-bottom: 16px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+  }
+  .card h2 {
+    font-size: 13px;
+    color: #444;
+    margin-bottom: 14px;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+  }
+
+  .grid2 {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 14px;
+  }
+  .grid3 {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 14px;
+  }
+  .field { display: flex; flex-direction: column; }
+  .field label {
+    font-size: 11px;
+    font-weight: 600;
+    color: #555;
+    margin-bottom: 4px;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+  .field input, .field textarea, .field select {
+    font-family: inherit;
+    font-size: 14px;
+    padding: 8px 10px;
+    border: 1px solid #c8ccd1;
+    border-radius: 6px;
+    background: #fff;
+    color: #222;
+    outline: none;
+    transition: border-color 0.15s, background 0.15s;
+  }
+  .field input:focus, .field textarea:focus, .field select:focus {
+    border-color: #2a6dde;
+    background: #fafcff;
+  }
+  .field textarea { resize: vertical; min-height: 60px; }
+  .full { grid-column: 1 / -1; }
+
+  /* Auto-detected pills */
+  .detected {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 12px;
+  }
+  .pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: #eef2f8;
+    border: 1px solid #d0dbed;
+    padding: 6px 10px;
+    border-radius: 16px;
+    font-size: 12px;
+    color: #324a6d;
+  }
+  .pill b { color: #1d2d49; font-weight: 600; }
+  .pill .edit-btn {
+    background: transparent;
+    border: none;
+    color: #2a6dde;
+    font-size: 11px;
+    cursor: pointer;
+    padding: 0 2px;
+  }
+  .pill .edit-btn:hover { text-decoration: underline; }
+
+  .breakdown {
+    margin-top: 8px;
+    border-top: 1px dashed #d0d4d9;
+    padding-top: 12px;
+    font-size: 13px;
+  }
+  .breakdown .line {
+    display: flex;
+    justify-content: space-between;
+    padding: 4px 0;
+  }
+  .breakdown .line .lbl { color: #555; }
+  .breakdown .line .val { font-family: ui-monospace, "SF Mono", Menlo, monospace; }
+  .breakdown .total {
+    border-top: 1px solid #c8ccd1;
+    margin-top: 6px;
+    padding-top: 8px;
+    font-weight: 600;
+  }
+  .match-ok { color: #1a7d3e; }
+  .match-bad { color: #b80000; }
+
+  .actions {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+    margin-top: 4px;
+  }
+  button.primary {
+    background: #2a6dde;
+    color: #fff;
+    border: none;
+    border-radius: 6px;
+    padding: 11px 20px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.15s;
+  }
+  button.primary:hover { background: #1f5bc2; }
+  button.primary:disabled { background: #b4c1d6; cursor: not-allowed; }
+  button.ghost {
+    background: transparent;
+    color: #2a6dde;
+    border: 1px solid #c8d4e7;
+    border-radius: 6px;
+    padding: 11px 18px;
+    font-size: 14px;
+    cursor: pointer;
+  }
+  button.ghost:hover { background: #eef2f8; }
+
+  /* Edit drawer */
+  details.editor {
+    margin-top: 12px;
+    border: 1px dashed #d0d4d9;
+    border-radius: 6px;
+    padding: 8px 12px;
+    background: #fafbfc;
+  }
+  details.editor summary {
+    cursor: pointer;
+    font-size: 12px;
+    color: #555;
+    font-weight: 600;
+  }
+  details.editor[open] summary { margin-bottom: 10px; }
+
+  .note {
+    font-size: 11.5px;
+    color: #777;
+    line-height: 1.55;
+    margin-top: 8px;
+  }
+
+  .footer {
+    text-align: center;
+    font-size: 11px;
+    color: #888;
+    margin-top: 24px;
+    line-height: 1.6;
+  }
+
+  /* 必須マーク・補助テキスト */
+  .req {
+    display: inline-block;
+    background: #c00;
+    color: #fff;
+    font-size: 10px;
+    font-weight: 700;
+    padding: 1px 6px;
+    border-radius: 3px;
+    margin-left: 4px;
+    letter-spacing: 0.04em;
+  }
+  .en {
+    font-size: 10.5px;
+    color: #888;
+    font-weight: 400;
+    font-style: italic;
+  }
+  .hint {
+    font-size: 11px;
+    color: #777;
+    margin-top: 4px;
+    line-height: 1.4;
+  }
+  .auto-mark {
+    display: inline-block;
+    background: #2a6dde;
+    color: #fff;
+    font-size: 10px;
+    font-weight: 600;
+    padding: 1px 6px;
+    border-radius: 10px;
+    margin-left: 6px;
+    letter-spacing: 0.02em;
+  }
+  .step-hint {
+    font-size: 12px;
+    color: #666;
+    margin: -6px 0 14px;
+    line-height: 1.5;
+  }
+  .bd-title {
+    font-size: 11px;
+    color: #555;
+    font-weight: 600;
+    margin-bottom: 6px;
+    letter-spacing: 0.03em;
+  }
+  .field label {
+    line-height: 1.35;
+  }
+</style>
+</head>
+<body>
+
+<div class="wrap">
+
+  <h1>時計 通関ワークシート ジェネレーター</h1>
+  <div class="sub">Watch / Clock Breakdown Worksheet — アメリカ通関用 PDF 作成ツール（DHL / FedEx / UPS 共通フォーマット）<br>すべてブラウザの中で処理されます。注文情報はサーバーに送信されません。</div>
+
+  <!-- 入力 -->
+  <div class="card">
+    <h2>① 注文情報を入力</h2>
+    <p class="step-hint">★印は必須項目です。eBay と DHL からコピペしてください。</p>
+    <div class="grid2">
+      <div class="field">
+        <label>注文番号 <span class="req">★必須</span><br><span class="en">Order ID</span></label>
+        <input id="order_id" type="text" placeholder="例: 28-12345-67890" autocomplete="off">
+        <div class="hint">eBay の Sold Order に表示される注文番号</div>
+      </div>
+      <div class="field">
+        <label>追跡番号 <span class="req">★必須</span><br><span class="en">Tracking # / HAWB</span></label>
+        <input id="awb" type="text" placeholder="例: 1234567890" autocomplete="off">
+        <div class="hint">DHL / FedEx / UPS いずれの追跡番号でも OK（配送ラベル or アプリに表示）</div>
+      </div>
+      <div class="field">
+        <label>発送日<br><span class="en">Ship Date</span></label>
+        <input id="ship_date" type="date">
+        <div class="hint">今日の日付が自動で入ります</div>
+      </div>
+      <div class="field">
+        <label>販売額 (USD) <span class="req">★必須</span><br><span class="en">Invoice Value</span></label>
+        <input id="invoice" type="number" step="0.01" min="0" placeholder="例: 285.00">
+        <div class="hint">eBay の販売価格（送料は含めない、ドル建て）</div>
+      </div>
+      <div class="field full">
+        <label>商品タイトル <span class="req">★必須</span> <span class="auto-mark">▶ 自動判定に使用</span><br><span class="en">eBay Item Title</span></label>
+        <input id="item_title" type="text" placeholder="例: Seiko 5 Automatic SNKL23 Stainless Steel 21 Jewels" autocomplete="off">
+        <div class="hint">eBay リスティングのタイトルをそのまま貼り付け → 素材・電池などを自動判定します</div>
+      </div>
+      <div class="field full">
+        <label>発送者名 / ショップ名 <span class="req">★必須</span><br><span class="en">Sender (FROM) — PDF に印字</span></label>
+        <input id="from_name" type="text" placeholder="例: 山田太郎 / Your Shop Name">
+        <div class="hint">あなたの名前 or ショップ名。PDF の左上「FROM」欄に印刷されます</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 自動判定結果 + 編集 -->
+  <div class="card">
+    <h2>② 自動判定結果（クリックで修正可）</h2>
+    <p class="step-hint">タイトルから自動判定した内容です。違っていたら下の「手動で変更する」を開いて修正してください。</p>
+    <div class="detected" id="pills"></div>
+
+    <details class="editor">
+      <summary>▼ 手動で変更する（クリックで開く） / Manual override</summary>
+      <div class="grid2" style="margin-top:10px;">
+        <div class="field">
+          <label>ムーブメント種類<br><span class="en">Movement Type</span></label>
+          <select id="o_movement">
+            <option value="analogue">アナログ (Analogue)</option>
+            <option value="digital">デジタル (Digital)</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>電源タイプ<br><span class="en">Power Type</span></label>
+          <select id="o_power">
+            <option value="battery">電池式 (Battery)</option>
+            <option value="wind_up">手巻き (Wind Up)</option>
+            <option value="self_winding">自動巻き (Self-Winding)</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>ストラップ素材<br><span class="en">Strap Material</span></label>
+          <input id="o_strap" type="text" value="Stainless Steel" placeholder="例: Leather / Stainless Steel">
+        </div>
+        <div class="field">
+          <label>ケース素材<br><span class="en">Case Material</span></label>
+          <input id="o_case" type="text" value="Stainless Steel" placeholder="例: Stainless Steel / Titanium">
+        </div>
+        <div class="field">
+          <label>宝石数<br><span class="en">Number of Jewels</span></label>
+          <input id="o_jewels" type="number" min="0" max="99" value="0">
+          <div class="hint">不明なら 0 のままで OK</div>
+        </div>
+        <div class="field">
+          <label>電池型番（電池式のときのみ）<br><span class="en">Battery Type</span></label>
+          <input id="o_battery" type="text" placeholder="例: SR626SW / CR2016">
+        </div>
+      </div>
+    </details>
+
+    <div class="breakdown" id="breakdown">
+      <div class="bd-title">金額按分（販売額を素材ごとに自動分配）</div>
+      <div class="line"><span class="lbl">ムーブメント / Movement</span><span class="val" id="bd_mv">$0.00</span></div>
+      <div class="line"><span class="lbl">ケース / Case</span><span class="val" id="bd_cs">$0.00</span></div>
+      <div class="line"><span class="lbl">ストラップ / Strap</span><span class="val" id="bd_st">$0.00</span></div>
+      <div class="line"><span class="lbl">電池 / Battery</span><span class="val" id="bd_bt">$0.00</span></div>
+      <div class="line total"><span class="lbl">合計 / Total <span id="bd_match" style="font-weight:normal;font-size:11px;margin-left:6px;"></span></span><span class="val" id="bd_total">$0.00</span></div>
+    </div>
+    <div class="note">
+      <b>按分比率:</b> ムーブメント 80% / ケース 10% / ストラップ 7% / 電池 3%<br>
+      自動巻き・手巻きの場合: ストラップ 10% / 電池 0%（電池無しのため）<br>
+      端数は最も金額の大きいムーブメントに寄せて、<b>合計が必ず販売額に一致</b>するよう調整します。
+    </div>
+  </div>
+
+  <!-- アクション -->
+  <div class="card">
+    <h2>③ PDF を作成</h2>
+    <p class="step-hint">必須項目（★）が埋まるとボタンが押せるようになります。</p>
+    <div class="actions">
+      <button class="primary" id="btn_pdf" onclick="generatePDF()">📄 PDFを作成してダウンロード</button>
+      <button class="ghost" onclick="clearAll()">クリア</button>
+      <button class="ghost" onclick="fillSample()">サンプル入力で試す</button>
+    </div>
+    <div class="note">
+      ファイル名: <code>WatchWorksheet_{注文番号}_{日付}.pdf</code><br>
+      ブラウザの「ダウンロード」フォルダに保存されます。
+    </div>
+  </div>
+
+  <div class="footer">
+    完全にブラウザ内で動作 · 注文データは外部に送信されません<br>
+    ※ ワニ革等の CITES 対象素材は別途書類が必要です（本ツールの対象外）
+  </div>
+
+</div>
+
+<script>
+  // ===================================================================
+  // 自動判定ロジック (Python版 detector.py の JS 移植)
+  // ===================================================================
+  function detectMovementType(text) {
+    const t = text.toLowerCase();
+    const kw = ['digital','lcd','led display','g-shock','g shock','baby-g','casio f-','casio f9','casio a1','casio aq','casio dw','atomic','radio controlled','radio-controlled','wave ceptor'];
+    return kw.some(k => t.includes(k)) ? 'digital' : 'analogue';
+  }
+  function detectPowerType(text) {
+    const t = text.toLowerCase();
+    if (['automatic','self-wind','self wind','self-winding','self winding','rotor'].some(k => t.includes(k))) return 'self_winding';
+    if (['manual wind','manual-wind','hand wind','hand-wind','hand winding','mecaquartz'].some(k => t.includes(k))) return 'wind_up';
+    return 'battery';
+  }
+  function detectStrap(text) {
+    const t = text.toLowerCase();
+    if (['leather','alligator','crocodile','calfskin'].some(k => t.includes(k))) return 'Leather';
+    if (['rubber','silicone','resin band','resin strap'].some(k => t.includes(k))) return 'Rubber/Silicone';
+    if (['nylon','nato strap','nato band','perlon','canvas'].some(k => t.includes(k))) return 'Nylon';
+    if (['titanium bracelet','titanium band'].some(k => t.includes(k))) return 'Titanium';
+    if (['stainless','metal band','metal bracelet','bracelet','oyster','jubilee','milanese','mesh band'].some(k => t.includes(k))) return 'Stainless Steel';
+    return 'Stainless Steel';
+  }
+  function detectCase(text) {
+    const t = text.toLowerCase();
+    if (['solid gold','18k gold case','14k gold case'].some(k => t.includes(k))) return 'Solid Gold';
+    if (t.includes('gold') && (t.includes('plated') || t.includes(' gp') || t.includes('filled'))) return 'Gold-Plated Stainless Steel';
+    if (t.includes('titanium')) return 'Titanium';
+    if (t.includes('ceramic')) return 'Ceramic';
+    if (['plastic case','resin case','resin body'].some(k => t.includes(k))) return 'Resin/Plastic';
+    if (['g-shock','g shock','baby-g','casio dw-','casio f-','casio f9'].some(k => t.includes(k))) return 'Resin/Plastic';
+    if (['stainless','ss case','steel case'].some(k => t.includes(k))) return 'Stainless Steel';
+    return 'Stainless Steel';
+  }
+  function detectJewels(text) {
+    const m = text.match(/(\d{1,2})\s*jewel/i);
+    if (m) {
+      const n = parseInt(m[1], 10);
+      if (n >= 0 && n <= 99) return n;
+    }
+    return 0;
+  }
+  function detectBattery(text) {
+    const patterns = [
+      /\bSR\s?\d{2,4}[A-Z]{1,3}\b/i,
+      /\bLR\s?\d{2,4}\b/i,
+      /\bCR\s?\d{3,4}\b/i,
+      /\bSG\s?\d{1,3}\b/i,
+      /\bAG\s?\d{1,3}\b/i,
+      /\b3\s?77\b/, /\b3\s?71\b/, /\b3\s?64\b/, /\b3\s?95\b/,
+    ];
+    for (const p of patterns) {
+      const m = text.match(p);
+      if (m) return m[0].toUpperCase().replace(/\s/g, '');
+    }
+    return '';
+  }
+
+  // 金額按分（合計が必ず total に一致）
+  function calcSplit(total, powerType) {
+    let r;
+    if (powerType === 'self_winding' || powerType === 'wind_up') {
+      r = { movement: 0.80, case: 0.10, strap: 0.10, battery: 0.00 };
+    } else {
+      r = { movement: 0.80, case: 0.10, strap: 0.07, battery: 0.03 };
+    }
+    const round2 = v => Math.round(v * 100) / 100;
+    const v = {
+      movement: round2(total * r.movement),
+      case:     round2(total * r.case),
+      strap:    round2(total * r.strap),
+      battery:  round2(total * r.battery),
+    };
+    const diff = round2(total - (v.movement + v.case + v.strap + v.battery));
+    v.movement = round2(v.movement + diff);
+    return v;
+  }
+
+  // ===================================================================
+  // UI 連動
+  // ===================================================================
+  const $ = id => document.getElementById(id);
+  const FIELDS = ['o_movement','o_power','o_strap','o_case','o_jewels','o_battery','invoice','item_title','order_id','awb','ship_date','from_name'];
+
+  function applyAutoDetect() {
+    const t = $('item_title').value || '';
+    if (!t.trim()) {
+      refreshDerived();
+      return;
+    }
+    $('o_movement').value = detectMovementType(t);
+    $('o_power').value    = detectPowerType(t);
+    $('o_strap').value    = detectStrap(t);
+    $('o_case').value     = detectCase(t);
+    $('o_jewels').value   = detectJewels(t);
+    $('o_battery').value  = detectBattery(t);
+    refreshDerived();
+  }
+
+  function refreshDerived() {
+    const total = parseFloat($('invoice').value) || 0;
+    const power = $('o_power').value;
+    const v = calcSplit(total, power);
+
+    $('bd_mv').textContent = '$' + v.movement.toFixed(2);
+    $('bd_cs').textContent = '$' + v.case.toFixed(2);
+    $('bd_st').textContent = '$' + v.strap.toFixed(2);
+    $('bd_bt').textContent = '$' + (power === 'battery' ? v.battery.toFixed(2) : '0.00') + (power !== 'battery' ? ' (—)' : '');
+    const sum = v.movement + v.case + v.strap + (power === 'battery' ? v.battery : 0);
+    $('bd_total').textContent = '$' + sum.toFixed(2);
+
+    const m = $('bd_match');
+    if (total > 0 && Math.abs(sum - total) < 0.011) {
+      m.textContent = '✓ matches invoice';
+      m.className = 'match-ok';
+    } else if (total > 0) {
+      m.textContent = '✗ mismatch';
+      m.className = 'match-bad';
+    } else {
+      m.textContent = '';
+      m.className = '';
+    }
+
+    renderPills();
+    $('btn_pdf').disabled = !(
+      total > 0 &&
+      $('order_id').value.trim() &&
+      $('awb').value.trim() &&
+      $('item_title').value.trim() &&
+      $('from_name').value.trim()
+    );
+  }
+
+  function renderPills() {
+    const pills = [
+      { lbl: 'Movement', val: $('o_movement').value === 'digital' ? 'Digital' : 'Analogue' },
+      { lbl: 'Power',    val: { battery: 'Battery', wind_up: 'Wind Up', self_winding: 'Self-Winding' }[$('o_power').value] },
+      { lbl: 'Strap',    val: $('o_strap').value },
+      { lbl: 'Case',     val: $('o_case').value },
+      { lbl: 'Jewels',   val: $('o_jewels').value },
+    ];
+    if ($('o_power').value === 'battery' && $('o_battery').value) {
+      pills.push({ lbl: 'Battery', val: $('o_battery').value });
+    }
+    $('pills').innerHTML = pills.map(p =>
+      `<span class="pill"><b>${p.lbl}</b> ${escapeHtml(p.val || '—')}</span>`
+    ).join('');
+  }
+
+  function escapeHtml(s) {
+    return String(s).replace(/[&<>"']/g, c => ({
+      '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'
+    }[c]));
+  }
+
+  // ===================================================================
+  // PDF生成（jsPDF）
+  // ===================================================================
+  function generatePDF() {
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF({ unit: 'pt', format: 'letter' });
+
+    const total = parseFloat($('invoice').value) || 0;
+    const power = $('o_power').value;
+    const movement = $('o_movement').value;
+    const v = calcSplit(total, power);
+
+    const data = {
+      from:     $('from_name').value || 'SimpleLifeDesignLab',
+      date:     $('ship_date').value || new Date().toISOString().split('T')[0],
+      awb:      $('awb').value,
+      order_id: $('order_id').value,
+      invoice:  total,
+      title:    $('item_title').value || '',
+      strap_mat: $('o_strap').value,
+      case_mat:  $('o_case').value,
+      jewels:    $('o_jewels').value,
+      battery_type: $('o_battery').value,
+      movement, power,
+      vals: v,
+    };
+
+    drawWorksheet(doc, data);
+
+    const safeId = (data.order_id || 'order').replace(/[\/\\]/g, '_');
+    const fname = `WatchWorksheet_${safeId}_${data.date}.pdf`;
+    doc.save(fname);
+  }
+
+  function drawWorksheet(doc, d) {
+    const pageW = 612, pageH = 792;
+    const left = 54, right = pageW - 54;
+
+    // タイトル
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(16);
+    doc.text('WATCH / CLOCK BREAKDOWN WORKSHEET', pageW / 2, 60, { align: 'center' });
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(8);
+    doc.text('U.S. Customs Declaration Support (per 19 CFR 141.86)', pageW / 2, 74, { align: 'center' });
+
+    // ヘッダ枠 (FROM / DATE / AWB)
+    const headerTop = 90;
+    const headerH = 56;
+    doc.setLineWidth(0.6);
+    doc.rect(left, headerTop, right - left, headerH);
+
+    const colW = (right - left) / 3;
+    doc.line(left + colW,     headerTop, left + colW,     headerTop + headerH);
+    doc.line(left + 2 * colW, headerTop, left + 2 * colW, headerTop + headerH);
+
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(8);
+    doc.text('FROM',                   left + 6,          headerTop + 14);
+    doc.text('DATE',                   left + colW + 6,   headerTop + 14);
+    doc.text('TRACKING # / HAWB',      left + 2*colW + 6, headerTop + 14);
+
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(10);
+    doc.text(String(d.from || ''),  left + 6,          headerTop + 32, { maxWidth: colW - 12 });
+    doc.text(String(d.date || ''),  left + colW + 6,   headerTop + 32);
+    doc.text(String(d.awb  || ''),  left + 2*colW + 6, headerTop + 32);
+
+    // Order info
+    let y = headerTop + headerH + 18;
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(9);
+    doc.text(`Order ID: ${d.order_id}    Invoice Value: $${d.invoice.toFixed(2)} USD`, left, y);
+
+    y += 14;
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(8);
+    const title = d.title.length > 95 ? d.title.slice(0, 92) + '...' : d.title;
+    doc.text(`Item: ${title}`, left, y);
+
+    // 明細枠
+    const detailTop = y + 14;
+    const detailBottom = pageH - 100;
+    const detailH = detailBottom - detailTop;
+    doc.setLineWidth(0.6);
+    doc.rect(left, detailTop, right - left, detailH);
+
+    const sectionH = detailH / 4;
+    const ySection = i => detailTop + i * sectionH;
+    // セパレータ
+    doc.line(left, ySection(1), right, ySection(1));
+    doc.line(left, ySection(2), right, ySection(2));
+    doc.line(left, ySection(3), right, ySection(3));
+
+    // 各セクション描画
+    drawStrap(doc, d, left, right, ySection(0), sectionH);
+    drawCase(doc, d, left, right, ySection(1), sectionH);
+    drawMovement(doc, d, left, right, ySection(2), sectionH);
+    drawPower(doc, d, left, right, ySection(3), sectionH);
+
+    // 合計
+    const totalSum = d.vals.movement + d.vals.case + d.vals.strap + (d.power === 'battery' ? d.vals.battery : 0);
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(10);
+    doc.text(`TOTAL (must equal Invoice Value): $${totalSum.toFixed(2)} USD`, left, detailBottom + 22);
+
+    doc.setFont('helvetica', 'italic');
+    doc.setFontSize(7);
+    doc.text(
+      'Generated in browser. Verify all values before submission. CITES-controlled materials are out of scope.',
+      left, detailBottom + 36
+    );
+  }
+
+  function sectionLabel(doc, label, x, y) {
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(11);
+    doc.text(label, x + 6, y + 14);
+  }
+  function fieldLabel(doc, txt, x, y) {
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(8);
+    doc.text(txt, x, y);
+  }
+  function fieldValue(doc, txt, x, y) {
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(10);
+    doc.text(String(txt), x, y);
+  }
+  function checkbox(doc, x, y, checked) {
+    doc.setLineWidth(0.6);
+    doc.rect(x, y, 9, 9);
+    if (checked) {
+      doc.setLineWidth(1.4);
+      doc.line(x + 1.5, y + 1.5, x + 7.5, y + 7.5);
+      doc.line(x + 7.5, y + 1.5, x + 1.5, y + 7.5);
+      doc.setLineWidth(0.6);
+    }
+  }
+
+  function drawStrap(doc, d, left, right, y, h) {
+    sectionLabel(doc, 'STRAP', left, y);
+    fieldLabel(doc, 'Material:', left + 80, y + 14);
+    fieldValue(doc, d.strap_mat, left + 140, y + 14);
+    fieldLabel(doc, 'Value (USD):', right - 160, y + 14);
+    fieldValue(doc, `$${d.vals.strap.toFixed(2)}`, right - 80, y + 14);
+  }
+  function drawCase(doc, d, left, right, y, h) {
+    sectionLabel(doc, 'CASE', left, y);
+    fieldLabel(doc, 'Material:', left + 80, y + 14);
+    fieldValue(doc, d.case_mat, left + 140, y + 14);
+    fieldLabel(doc, 'Value (USD):', right - 160, y + 14);
+    fieldValue(doc, `$${d.vals.case.toFixed(2)}`, right - 80, y + 14);
+  }
+  function drawMovement(doc, d, left, right, y, h) {
+    sectionLabel(doc, 'MOVEMENT', left, y);
+
+    const cbY = y + 28;
+    fieldLabel(doc, 'Type:', left + 6, cbY + 7);
+    checkbox(doc, left + 45,  cbY, d.movement === 'analogue');
+    fieldValue(doc, 'Analogue', left + 60, cbY + 7);
+    checkbox(doc, left + 130, cbY, d.movement === 'digital');
+    fieldValue(doc, 'Digital',  left + 145, cbY + 7);
+
+    fieldLabel(doc, 'Number of Jewels:', left + 230, cbY + 7);
+    fieldValue(doc, d.jewels,             left + 330, cbY + 7);
+
+    fieldLabel(doc, 'Value (USD):',                  right - 160, y + 14);
+    fieldValue(doc, `$${d.vals.movement.toFixed(2)}`, right - 80,  y + 14);
+  }
+  function drawPower(doc, d, left, right, y, h) {
+    sectionLabel(doc, 'POWER', left, y);
+
+    const cbY = y + 28;
+    fieldLabel(doc, 'Type:', left + 6, cbY + 7);
+    checkbox(doc, left + 45,  cbY, d.power === 'battery');
+    fieldValue(doc, 'Battery',      left + 60,  cbY + 7);
+    checkbox(doc, left + 125, cbY, d.power === 'wind_up');
+    fieldValue(doc, 'Wind Up',      left + 140, cbY + 7);
+    checkbox(doc, left + 200, cbY, d.power === 'self_winding');
+    fieldValue(doc, 'Self-Winding', left + 215, cbY + 7);
+
+    const btY = cbY + 22;
+    fieldLabel(doc, 'Battery Type:', left + 6, btY + 7);
+    if (d.power === 'battery') {
+      fieldValue(doc, d.battery_type || '(unknown)', left + 90, btY + 7);
+      fieldLabel(doc, 'Battery Value (USD):',         right - 160, btY + 7);
+      fieldValue(doc, `$${d.vals.battery.toFixed(2)}`, right - 60,  btY + 7);
+    } else {
+      fieldValue(doc, '—', left + 90, btY + 7);
+      fieldLabel(doc, 'Battery Value (USD):', right - 160, btY + 7);
+      fieldValue(doc, '—', right - 60, btY + 7);
+    }
+  }
+
+  // ===================================================================
+  // 初期化 / イベント
+  // ===================================================================
+  function clearAll() {
+    $('order_id').value = '';
+    $('awb').value = '';
+    $('invoice').value = '';
+    $('item_title').value = '';
+    $('o_strap').value = 'Stainless Steel';
+    $('o_case').value  = 'Stainless Steel';
+    $('o_jewels').value = '0';
+    $('o_battery').value = '';
+    $('o_movement').value = 'analogue';
+    $('o_power').value = 'battery';
+    $('ship_date').value = new Date().toISOString().split('T')[0];
+    refreshDerived();
+    $('order_id').focus();
+  }
+
+  function fillSample() {
+    $('order_id').value = '28-12345-67890';
+    $('awb').value      = '1234567890';
+    $('invoice').value  = '285';
+    $('item_title').value = 'Seiko 5 Automatic SNKL23 Stainless Steel 21 Jewels';
+    applyAutoDetect();
+  }
+
+  // 入力イベント
+  $('item_title').addEventListener('input', applyAutoDetect);
+  ['invoice','o_movement','o_power','o_strap','o_case','o_jewels','o_battery','order_id','awb','from_name','ship_date']
+    .forEach(id => $(id).addEventListener('input', refreshDerived));
+
+  // 初期値
+  $('ship_date').value = new Date().toISOString().split('T')[0];
+  refreshDerived();
+</script>
+
+</body>
+</html>
