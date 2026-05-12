@@ -244,6 +244,89 @@
   .field label {
     line-height: 1.35;
   }
+
+  /* 金額按分 input */
+  .val-wrap {
+    display: inline-flex;
+    align-items: center;
+    gap: 2px;
+  }
+  .cur {
+    font-family: ui-monospace, "SF Mono", Menlo, monospace;
+    color: #888;
+    font-size: 13px;
+  }
+  .bd-input {
+    font-family: ui-monospace, "SF Mono", Menlo, monospace;
+    font-size: 13px;
+    border: 1px solid #d0d4d9;
+    border-radius: 4px;
+    padding: 4px 8px;
+    width: 100px;
+    text-align: right;
+    background: #fff;
+    color: #222;
+    outline: none;
+    transition: border-color 0.15s, background 0.15s;
+  }
+  .bd-input:focus {
+    border-color: #2a6dde;
+    background: #fafcff;
+  }
+  .bd-input.edited {
+    border-color: #d68a00;
+    background: #fff8e8;
+  }
+  .bd-input:disabled {
+    background: #f0f1f3;
+    color: #999;
+    cursor: not-allowed;
+  }
+  .val-total {
+    font-family: ui-monospace, "SF Mono", Menlo, monospace;
+    font-size: 14px;
+    font-weight: 600;
+    min-width: 100px;
+    text-align: right;
+    display: inline-block;
+    padding: 4px 8px;
+  }
+  .lbl-sub {
+    font-size: 10.5px;
+    color: #888;
+    font-weight: normal;
+    margin-left: 6px;
+  }
+  .match-row {
+    margin-top: 10px;
+    padding: 8px 12px;
+    border-radius: 6px;
+    font-size: 12px;
+    font-weight: 600;
+    display: none;
+  }
+  .match-row.ok {
+    display: block;
+    background: #e6f4ec;
+    color: #1a7d3e;
+    border: 1px solid #b9e0c8;
+  }
+  .match-row.bad {
+    display: block;
+    background: #fbe9e9;
+    color: #b80000;
+    border: 1px solid #f3b8b8;
+  }
+  .ghost-mini {
+    background: transparent;
+    color: #2a6dde;
+    border: 1px solid #c8d4e7;
+    border-radius: 5px;
+    padding: 5px 12px;
+    font-size: 12px;
+    cursor: pointer;
+  }
+  .ghost-mini:hover { background: #eef2f8; }
 </style>
 </head>
 <body>
@@ -336,17 +419,36 @@
     </details>
 
     <div class="breakdown" id="breakdown">
-      <div class="bd-title">金額按分（販売額を素材ごとに自動分配）</div>
-      <div class="line"><span class="lbl">ムーブメント / Movement</span><span class="val" id="bd_mv">$0.00</span></div>
-      <div class="line"><span class="lbl">ケース / Case</span><span class="val" id="bd_cs">$0.00</span></div>
-      <div class="line"><span class="lbl">ストラップ / Strap</span><span class="val" id="bd_st">$0.00</span></div>
-      <div class="line"><span class="lbl">電池 / Battery</span><span class="val" id="bd_bt">$0.00</span></div>
-      <div class="line total"><span class="lbl">合計 / Total <span id="bd_match" style="font-weight:normal;font-size:11px;margin-left:6px;"></span></span><span class="val" id="bd_total">$0.00</span></div>
+      <div class="bd-title">金額按分 — 自動計算（数値クリックで手動編集可）</div>
+      <div class="line">
+        <span class="lbl">ムーブメント / Movement</span>
+        <span class="val-wrap"><span class="cur">$</span><input type="number" class="bd-input" id="bd_mv" step="0.01" min="0" value="0"></span>
+      </div>
+      <div class="line">
+        <span class="lbl">ケース / Case</span>
+        <span class="val-wrap"><span class="cur">$</span><input type="number" class="bd-input" id="bd_cs" step="0.01" min="0" value="0"></span>
+      </div>
+      <div class="line">
+        <span class="lbl">ストラップ / Strap</span>
+        <span class="val-wrap"><span class="cur">$</span><input type="number" class="bd-input" id="bd_st" step="0.01" min="0" value="0"></span>
+      </div>
+      <div class="line">
+        <span class="lbl">電池 / Battery <span class="lbl-sub" id="bd_bt_note"></span></span>
+        <span class="val-wrap"><span class="cur">$</span><input type="number" class="bd-input" id="bd_bt" step="0.01" min="0" value="0"></span>
+      </div>
+      <div class="line total">
+        <span class="lbl">合計 / Total</span>
+        <span class="val-wrap"><span class="cur">$</span><span class="val-total" id="bd_total">0.00</span></span>
+      </div>
+      <div id="bd_match" class="match-row"></div>
+      <div style="margin-top:10px;">
+        <button class="ghost-mini" onclick="autoReSplit()">↻ 自動計算に戻す</button>
+      </div>
     </div>
     <div class="note">
-      <b>按分比率:</b> ムーブメント 80% / ケース 10% / ストラップ 7% / 電池 3%<br>
+      <b>自動按分比率:</b> ムーブメント 80% / ケース 10% / ストラップ 7% / 電池 3%<br>
       自動巻き・手巻きの場合: ストラップ 10% / 電池 0%（電池無しのため）<br>
-      端数は最も金額の大きいムーブメントに寄せて、<b>合計が必ず販売額に一致</b>するよう調整します。
+      <b style="color:#b80000;">⚠ 合計が販売額と一致しないと PDF を作成できません。</b>
     </div>
   </div>
 
@@ -472,38 +574,86 @@
     refreshDerived();
   }
 
-  function refreshDerived() {
+  // 手動編集フラグ: true の間は自動再計算で上書きしない
+  let manualEdited = false;
+
+  function autoReSplit() {
+    manualEdited = false;
+    applyAutoSplit();
+    ['bd_mv','bd_cs','bd_st','bd_bt'].forEach(id => $(id).classList.remove('edited'));
+    validateAndUpdate();
+  }
+
+  function applyAutoSplit() {
     const total = parseFloat($('invoice').value) || 0;
     const power = $('o_power').value;
     const v = calcSplit(total, power);
+    $('bd_mv').value = v.movement.toFixed(2);
+    $('bd_cs').value = v.case.toFixed(2);
+    $('bd_st').value = v.strap.toFixed(2);
+    $('bd_bt').value = (power === 'battery' ? v.battery : 0).toFixed(2);
+  }
 
-    $('bd_mv').textContent = '$' + v.movement.toFixed(2);
-    $('bd_cs').textContent = '$' + v.case.toFixed(2);
-    $('bd_st').textContent = '$' + v.strap.toFixed(2);
-    $('bd_bt').textContent = '$' + (power === 'battery' ? v.battery.toFixed(2) : '0.00') + (power !== 'battery' ? ' (—)' : '');
-    const sum = v.movement + v.case + v.strap + (power === 'battery' ? v.battery : 0);
-    $('bd_total').textContent = '$' + sum.toFixed(2);
+  function setBatteryFieldByPower() {
+    const power = $('o_power').value;
+    const note = $('bd_bt_note');
+    const btInput = $('bd_bt');
+    if (power === 'battery') {
+      note.textContent = '';
+      btInput.disabled = false;
+    } else {
+      note.textContent = '(電池無しタイプのため $0.00)';
+      btInput.value = '0.00';
+      btInput.disabled = true;
+    }
+  }
+
+  function validateAndUpdate() {
+    const total = parseFloat($('invoice').value) || 0;
+    const mv = parseFloat($('bd_mv').value) || 0;
+    const cs = parseFloat($('bd_cs').value) || 0;
+    const st = parseFloat($('bd_st').value) || 0;
+    const bt = parseFloat($('bd_bt').value) || 0;
+    const sum = mv + cs + st + bt;
+
+    $('bd_total').textContent = sum.toFixed(2);
 
     const m = $('bd_match');
-    if (total > 0 && Math.abs(sum - total) < 0.011) {
-      m.textContent = '✓ matches invoice';
-      m.className = 'match-ok';
-    } else if (total > 0) {
-      m.textContent = '✗ mismatch';
-      m.className = 'match-bad';
+    let isOK = false;
+    if (total <= 0) {
+      m.textContent = '販売額 (Invoice) を入力してください';
+      m.className = 'match-row bad';
+    } else if (Math.abs(sum - total) < 0.011) {
+      m.textContent = `✓ 合計 $${sum.toFixed(2)} が販売額 $${total.toFixed(2)} と一致しています`;
+      m.className = 'match-row ok';
+      isOK = true;
     } else {
-      m.textContent = '';
-      m.className = '';
+      const diff = sum - total;
+      const sign = diff > 0 ? '超過' : '不足';
+      m.innerHTML = `✗ <b>合計が販売額と一致しません</b>
+        合計 $${sum.toFixed(2)} − 販売額 $${total.toFixed(2)} = ${diff > 0 ? '+' : ''}$${diff.toFixed(2)} (${sign})<br>
+        <span style="font-weight:normal;font-size:11px;">「↻ 自動計算に戻す」ボタンで再計算するか、各金額を調整して合計を販売額に一致させてください。</span>`;
+      m.className = 'match-row bad';
     }
 
     renderPills();
     $('btn_pdf').disabled = !(
       total > 0 &&
+      isOK &&
       $('order_id').value.trim() &&
       $('awb').value.trim() &&
       $('item_title').value.trim() &&
       $('from_name').value.trim()
     );
+  }
+
+  // 商品タイトル変更時：判定 + 自動再計算（手動編集をリセット）
+  function refreshDerived() {
+    setBatteryFieldByPower();
+    if (!manualEdited) {
+      applyAutoSplit();
+    }
+    validateAndUpdate();
   }
 
   function renderPills() {
@@ -538,10 +688,16 @@
     const total = parseFloat($('invoice').value) || 0;
     const power = $('o_power').value;
     const movement = $('o_movement').value;
-    const v = calcSplit(total, power);
+    // 手動編集された値を優先して使う
+    const vals = {
+      movement: parseFloat($('bd_mv').value) || 0,
+      case:     parseFloat($('bd_cs').value) || 0,
+      strap:    parseFloat($('bd_st').value) || 0,
+      battery:  parseFloat($('bd_bt').value) || 0,
+    };
 
     const data = {
-      from:     $('from_name').value || 'SimpleLifeDesignLab',
+      from:     $('from_name').value,
       date:     $('ship_date').value || new Date().toISOString().split('T')[0],
       awb:      $('awb').value,
       order_id: $('order_id').value,
@@ -552,7 +708,7 @@
       jewels:    $('o_jewels').value,
       battery_type: $('o_battery').value,
       movement, power,
-      vals: v,
+      vals,
     };
 
     drawWorksheet(doc, data);
@@ -731,6 +887,7 @@
     $('awb').value = '';
     $('invoice').value = '';
     $('item_title').value = '';
+    $('from_name').value = '';
     $('o_strap').value = 'Stainless Steel';
     $('o_case').value  = 'Stainless Steel';
     $('o_jewels').value = '0';
@@ -738,6 +895,8 @@
     $('o_movement').value = 'analogue';
     $('o_power').value = 'battery';
     $('ship_date').value = new Date().toISOString().split('T')[0];
+    manualEdited = false;
+    ['bd_mv','bd_cs','bd_st','bd_bt'].forEach(id => $(id).classList.remove('edited'));
     refreshDerived();
     $('order_id').focus();
   }
@@ -747,13 +906,37 @@
     $('awb').value      = '1234567890';
     $('invoice').value  = '285';
     $('item_title').value = 'Seiko 5 Automatic SNKL23 Stainless Steel 21 Jewels';
+    manualEdited = false;
     applyAutoDetect();
   }
 
-  // 入力イベント
-  $('item_title').addEventListener('input', applyAutoDetect);
-  ['invoice','o_movement','o_power','o_strap','o_case','o_jewels','o_battery','order_id','awb','from_name','ship_date']
-    .forEach(id => $(id).addEventListener('input', refreshDerived));
+  // 商品タイトル入力 → 自動判定 + 再計算（手動編集モード解除）
+  $('item_title').addEventListener('input', () => {
+    manualEdited = false;
+    ['bd_mv','bd_cs','bd_st','bd_bt'].forEach(id => $(id).classList.remove('edited'));
+    applyAutoDetect();
+  });
+
+  // 上部入力 / オーバーライド変更 → 自動再計算（手動編集モード解除）
+  ['invoice','o_movement','o_power']
+    .forEach(id => $(id).addEventListener('input', () => {
+      manualEdited = false;
+      ['bd_mv','bd_cs','bd_st','bd_bt'].forEach(x => $(x).classList.remove('edited'));
+      refreshDerived();
+    }));
+
+  // 表示系の変更（再計算は不要、pillsだけ更新）
+  ['o_strap','o_case','o_jewels','o_battery','order_id','awb','from_name','ship_date']
+    .forEach(id => $(id).addEventListener('input', validateAndUpdate));
+
+  // 金額按分 input の手動編集 → manualEdited フラグを立てて検証
+  ['bd_mv','bd_cs','bd_st','bd_bt'].forEach(id => {
+    $(id).addEventListener('input', () => {
+      manualEdited = true;
+      $(id).classList.add('edited');
+      validateAndUpdate();
+    });
+  });
 
   // 初期値
   $('ship_date').value = new Date().toISOString().split('T')[0];
